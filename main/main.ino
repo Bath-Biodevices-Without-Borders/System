@@ -1,32 +1,59 @@
-
-#include <SoftwareSerial.h>
-
-const int txPin = 2;
-const int rxPin = 3;
-
-SoftwareSerial bleSerial(txPin, rxPin);
-
-int counter = -1;
+// Initialise Variables
+#define condPin1 A1
+#define condTempPin1 A2
+#define condTempPin2 A3
+#define condPin1 A4
 
 void setup() {
+  // put your setup code here, to run once:
   Serial.begin(9600);
-  bleSerial.begin(9600);
+  pinMode(condPin1, INPUT);           // A1 - Output current 1.
+  pinMode(condTempPin1, INPUT);      // A2 - Temperature 1.
+  pinMode(condTempPin2, INPUT);      // A3 - Temperature 2.
+  pinMode(condPin1, INPUT);           // A4 - Output current 2.
 }
 
 void loop() {
-  String bleData = "_";
+  float conductivity = readConductivity();
+}
 
-  if (bleSerial.available()) {
-    bleData = bleSerial.readString();
-    Serial.write("RECEIVED:");
-    Serial.println(bleData);
-  }
+float readConductivity() {
+  // put your main code here, to run repeatedly:
+  // Set all variables to zero.
+  float Cond_Voltage1 = 0; // A1 - Output voltage 1.
+  float Cond_Voltage2 = 0; // A4 - Output voltage 2.
+  float Cond_Current1 = 0; // A1 - Output current 1.
+  float Cond_Current2 = 0; // A4 - Output current 2.
+  float Cond_Temp1 = 0;    // A2 - Temperature 1.
+  float Cond_Temp2 = 0;    // A3 - Temperature 2.
 
-  if (bleData == "takeReading") {
-    delay(5000);
-    Serial.write("TRANSMITTED");
-    bleSerial.println("5,4,dateTime,3,37.78825,-122.4324,2,1,1,2,3");
-    bleSerial.println("$");
-    bleData = '_';
-  }
+  float Avg_Temp;          // Average Temperature of the solution.
+  float Avg_Voltage;       // Average Voltage.
+  float Avg_Current;       // Average Current.
+  float Conductance;       // Conductance of the solution.
+  float Conductivity;      // Electrical Conductivity of the solution.
+
+  float resistance = 1000; // Resistance (Ohms).
+  float length = 1;        // Length of the solution (m).
+
+  // Read values on input pins.
+  Cond_Voltage1 += ((float)analogRead(condPin1)/1023)*5;
+  Cond_Temp1 += ((float)analogRead(condTempPin1)/1023)*5;
+  Cond_Temp2 += ((float)analogRead(condTempPin2)/1023)*5;
+  Cond_Voltage2 += ((float)analogRead(condPin1)/1023)*5;
+
+  // Calculate current and average variables.
+  Cond_Current1 = (float)(Cond_Voltage1/resistance);
+  Cond_Current2 = (float)(Cond_Voltage2/resistance);
+  Avg_Temp = (float)(Cond_Temp1 + Cond_Temp2)/2;
+  Avg_Voltage = (float)(Cond_Voltage1 + Cond_Voltage2)/2;
+  Avg_Current = (float)((Cond_Current1 + Cond_Current2)/2);
+
+  // Calculate conductance and conductivity.
+  Conductance = Avg_Current/Avg_Voltage;
+  Conductivity = (Conductance * length) / (length + (Conductance * 0.4) + (Avg_Temp - 25));    // Define length.
+
+  Serial.println("Conductivity");
+  Serial.println(Conductivity);
+  return Conductivity;
 }
