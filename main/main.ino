@@ -18,11 +18,13 @@ TinyGPS gps;
 
 #define WATER_SENSOR 11
 
-// Initialise Variables
-#define condPin1 A1
-#define condTempPin1 A2
-#define condTempPin2 A3
-#define condPin1 A4
+#define condPin1 A0
+#define condTempPin1 A1
+#define condTempPin2 A2
+#define condPin1 A3
+
+#define fluPin A4
+#define chlPin A5
 
 int ledStartTime = 0;
 
@@ -46,13 +48,16 @@ void setup() {
   pinMode(condTempPin2, INPUT);      // A3 - Temperature 2.
   pinMode(condPin1, INPUT);           // A4 - Output current 2.
 
+  pinMode(fluPin, INPUT);             // A5 - Fluorescence.
+  pinMode(chlPin, INPUT);             // A6 - Chlorophyll.
+
   pinMode(startBtnPin, INPUT);
 
   pinMode(WATER_SENSOR, INPUT);
   // put your setup code here, to run once:
   Serial.begin (9600);
-  bleSerial.begin(9600);
   gpsSerial.begin(9600);
+  bleSerial.begin(9600);
 };
 
 void loop() {
@@ -113,26 +118,53 @@ String receiveBluetoothMessage() {
 void transmitBluetoothMessage(String message) {
   bleSerial.listen();
   bleSerial.println(message);
-  Serial.println(message);
+  Serial.println("BLE Sent Message");
 }
 
 String takeReading() {
-  float chl[10] = {25, 24, 25, 24, 23, 22, 23, 22, 22.5, 22.9};
-  float cond[10] = {100, 101.5, 103.6, 102.9, 102, 103.5, 102.3, 101.8, 102.6, 102.5};
-  float flu[10] = {0.9, 0.8, 0.9, 0.88, 0.91, 0.89, 0.83, 0.86, 0.92, 0.86};
-  float nit[10] = {26, 25.6, 24.9, 25.8, 25.9, 26.3, 25.7, 24.8, 25.5, 25.8};
-  float pH[10] = {6.9, 7.3, 7.2, 7.5, 7.3, 7.4, 7.5, 7.3, 7.2, 6.9};
-  float turb[10] = {0.11, 0.12, 0.11, 0.11, 0.10, 0.11, 0.12, 0.11, 0.09, 0.10};
-  float t[10] = {5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5};
   int numOfReadings = 10;
+  float *chl = (float*)calloc(numOfReadings, sizeof(float));
+  float *cond = (float*)calloc(numOfReadings, sizeof(float));
+  float *flu = (float*)calloc(numOfReadings, sizeof(float));
+  float *nit = (float*)calloc(numOfReadings, sizeof(float));
+  float *pH = (float*)calloc(numOfReadings, sizeof(float));
+  float *turb = (float*)calloc(numOfReadings, sizeof(float));
+  unsigned long *t = (unsigned long*)calloc(numOfReadings, sizeof(unsigned long));
+  // float chl[10] = {25, 24, 25, 24, 23, 22, 23, 22, 22.5, 22.9};
+  // float cond[10] = {100, 101.5, 103.6, 102.9, 102, 103.5, 102.3, 101.8, 102.6, 102.5};
+  // float flu[10] = {0.9, 0.8, 0.9, 0.88, 0.91, 0.89, 0.83, 0.86, 0.92, 0.86};
+  // float nit[10] = {26, 25.6, 24.9, 25.8, 25.9, 26.3, 25.7, 24.8, 25.5, 25.8};
+  // float pH[10] = {6.9, 7.3, 7.2, 7.5, 7.3, 7.4, 7.5, 7.3, 7.2, 6.9};
+  // float turb[10] = {0.11, 0.12, 0.11, 0.11, 0.10, 0.11, 0.12, 0.11, 0.09, 0.10};
+  // float t[10] = {5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5};
+
   float latitude, longitude;
   unsigned long date, time;
-
   gpsInfo(gps, &latitude, &longitude, &date, &time);
 
-  int stableIndex = findCommonStableIndex(numOfReadings, chl, cond, flu, nit, pH, turb);
-  int safe = isSafe(stableIndex, numOfReadings, chl, cond, flu, nit, pH, turb);
+  int index = 0;
+  int timeInterval = 200;
+  unsigned long prevTime = millis();
+  while(index < numOfReadings) {
+    unsigned long currentTime = millis();
+    if (currentTime > (prevTime + timeInterval)) {
+      prevTime += timeInterval;
+      chl[index] = readChl();
+      cond[index] = 0;
+      flu[index] = readFlu();
+      nit[index] = 0;
+      pH[index] = 0;
+      turb[index] = 0;
+      t[index] = timeInterval * index;
+      index++;
+    }
+  }
+  Serial.println("Done taking readings");
+
+  int stableIndex = 0; // findCommonStableIndex(numOfReadings, chl, cond, flu, nit, pH, turb);
+  int safe = 0; // isSafe(stableIndex, numOfReadings, chl, cond, flu, nit, pH, turb);
   String message = createMessage(stableIndex, numOfReadings, safe, latitude, longitude, date, time, chl, cond, flu, nit, pH, turb, t);
+  Serial.println(message);
   changeLEDColor(safe);
   return message;
 }
@@ -151,6 +183,7 @@ void gpsInfo(TinyGPS &gps, float *latitude, float *longitude, unsigned long *dat
       gpsData = gpsSerial.read();
       if (gps.encode(gpsData)) {
         // Once data is encoded, you can stop looping
+        Serial.println("GPS Data Received");
         gpsListening = 0;
         gps.f_get_position(latitude, longitude);
         gps.get_datetime(date, time);
@@ -159,6 +192,22 @@ void gpsInfo(TinyGPS &gps, float *latitude, float *longitude, unsigned long *dat
       }
     }
   }
+}
+
+float readChl() {
+  int chlValue = analogRead(chlPin);
+  float chl = float(chlValue);
+  Serial.print("Chl - ");
+  Serial.println(chl);
+  return chl;
+}
+
+float readFlu() {
+  int fluValue = analogRead(fluPin);
+  float flu = float(fluValue);
+  Serial.print("Flu - ");
+  Serial.println(flu);
+  return flu;
 }
 
 int findCommonStableIndex(int numOfReadings, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb) {
@@ -239,7 +288,7 @@ float getMean(float *resultsArray, int startIndex, int numOfReadings) {
   return mean;
 }
 
-String createMessage(int start_idx, int numOfReadings, int result, float latitude, float longitude, unsigned long date, unsigned long time, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb, float *t) {
+String createMessage(int start_idx, int numOfReadings, int result, float latitude, float longitude, unsigned long date, unsigned long time, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb, unsigned long *t) {
   String message = "";
   for(int i = start_idx; i < numOfReadings; i++) {
     message.concat(String(t[i])+ "," + String(chl[i]) + "," + String(cond[i]) + "," + String(flu[i]) + "," + String(nit[i]) + "," + String(pH[i]) + "," + String(turb[i]) + "?");
