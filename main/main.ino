@@ -16,6 +16,8 @@ TinyGPS gps;
 
 #define startBtnPin 10
 
+#define WATER_SENSOR 2
+
 int ledStartTime = 0;
 
 SoftwareSerial bleSerial(bleTxPin, bleRxPin);
@@ -34,8 +36,9 @@ void setup() {
   digitalWrite(blueLEDPin, LOW);
 
   pinMode(startBtnPin, INPUT);
-  Serial.begin(9600);
-  bleSerial.begin(9600);
+  // put your setup code here, to run once:
+  Serial.begin (9600);
+  pinMode(WATER_SENSOR, INPUT);
   gpsSerial.begin(9600);
 };
 
@@ -46,14 +49,18 @@ void loop() {
 
   //if this message recieved is takeReading
   if (receiveMessage == "takeReading" || startBtnState == HIGH) {
-    Serial.println("takeReading");
-    String message = takeReading();
-    startBtnState = 0;
-    ledStartTime = millis();
+    if (inWater()) {
+      Serial.println("takeReading");
+      String message = takeReading();
+      startBtnState = 0;
+      ledStartTime = millis();
 
-    if (receiveMessage == "takeReading") {
-      transmitBluetoothMessage(message);
-      receiveMessage = '_';
+      if (receiveMessage == "takeReading") {
+        transmitBluetoothMessage(message);
+        receiveMessage = '_';
+      }
+    } else {
+      Serial.println("Not in water");
     }
   }
 
@@ -61,6 +68,18 @@ void loop() {
     setRgbLedColor(0, 0, 0);
   }
    
+}
+
+int inWater() {
+  int value = digitalRead(WATER_SENSOR);
+  if (value == 1) {
+    Serial.print("Not in water - ");
+    Serial.println(value);
+  } else {
+    Serial.print("In water - ");
+    Serial.println(value);
+  }
+  return value;
 }
 
 String receiveBluetoothMessage() {
@@ -218,6 +237,7 @@ void changeLEDColor(int isSafe) {
     Serial.println("Unsafe");
     setRgbLedColor(1, 0, 0);
   }
+  return value;
 }
 
 void setRgbLedColor(int r, int g, int b) {
