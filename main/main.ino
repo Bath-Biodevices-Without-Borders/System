@@ -3,6 +3,10 @@
 #include "TinyGPS.h"
 TinyGPS gps;
 
+//##################################################################
+/////////////////////////// CONSTANTS //////////////////////////////
+//##################################################################
+
 #define bleRxPin 2
 #define bleTxPin 3
 
@@ -28,11 +32,17 @@ TinyGPS gps;
 
 int ledStartTime = 0;
 
+int bluetoothEnabled = 0;
+
 SoftwareSerial bleSerial(bleTxPin, bleRxPin);
 SoftwareSerial gpsSerial(gpsTxPin, gpsRxPin);
 
 void gpsInfo(TinyGPS &gps);
 byte gpsData;
+
+//##################################################################
+/////////////////////////// SETUP //////////////////////////////////
+//##################################################################
 
 void setup() {
   //initialise red, green & blue LED pins as outputs
@@ -60,23 +70,22 @@ void setup() {
   bleSerial.begin(9600);
 };
 
+//##################################################################
+/////////////////////////// LOOP///// //////////////////////////////
+//##################################################################
+
 void loop() {
   int startBtnState = digitalRead(startBtnPin);
 
-  String receiveMessage = receiveBluetoothMessage();
+  bluetoothEnabled = receiveBluetoothMessage();
 
   //if this message recieved is takeReading
-  if (receiveMessage == "takeReading" || startBtnState == HIGH) {
+  if (bluetoothEnabled || startBtnState == HIGH) {
     if (inWater()) {
       Serial.println("takeReading");
       String message = takeReading();
       startBtnState = 0;
       ledStartTime = millis();
-
-      if (receiveMessage == "takeReading") {
-        transmitBluetoothMessage(message);
-        receiveMessage = '_';
-      }
     } else {
       Serial.println("Not in water");
     }
@@ -88,20 +97,12 @@ void loop() {
    
 }
 
-int inWater() {
-  int value = digitalRead(WATER_SENSOR);
-  if (value == 1) {
-    Serial.print("Not in water - ");
-    Serial.println(value);
-  } else {
-    Serial.print("In water - ");
-    Serial.println(value);
-  }
-  return 1;
-}
+//##################################################################
+/////////////////////////// OUTPUT /////////////////////////////////
+//##################################################################
 
-String receiveBluetoothMessage() {
-  String message = "_";
+int receiveBluetoothMessage() {
+  int enabled = 0;
   int replaced = bleSerial.listen();
 
   if (replaced) {
@@ -110,19 +111,79 @@ String receiveBluetoothMessage() {
 
   if (bleSerial.available()) {
     Serial.println("AVAILABLE!");
-    message = bleSerial.readString();
+    String message = bleSerial.readString();
+    if (message == "takeReading") {
+      enabled = 1;
+    }
   }
-  return message;
+  return enabled;
 }
 
 void transmitBluetoothMessage(String message) {
-  bleSerial.listen();
-  bleSerial.println(message);
   Serial.println("BLE Sent Message");
+  bleSerial.listen();
+  bleSerial.print(message);
 }
 
+String createMessage(int start_idx, int numOfReadings, int result, float latitude, float longitude, unsigned long date, unsigned long time, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb, unsigned long *t) {
+  String message = "";
+  for(int i = start_idx; i < numOfReadings; i++) {
+    String subMessage = String(t[i])+ "," + String(chl[i]) + "," + String(cond[i]) + "," + String(flu[i]) + "," + String(nit[i]) + "," + String(pH[i]) + "," + String(turb[i]) + "?";
+    Serial.println(subMessage);
+    message.concat(subMessage);
+  }
+  String subMessage = String(latitude) + "," + String(longitude) + "," + String(date) + "," + String(time) + "," + String(result) + "!";
+  Serial.println(subMessage);
+  message.concat(subMessage);
+  return message;
+}
+
+void gpsInfo(TinyGPS &gps, float *latitude, float *longitude, unsigned long *date, unsigned long *time) {
+  // Make arduino listen to GPS
+  gpsSerial.listen();
+  Serial.println("Listening to GPS");
+  // Check if Arduino is listening to GPS
+  int gpsListening = gpsSerial.isListening();
+  while(gpsListening) {
+    // Loop until there is data in the serial buffer
+    if (gpsSerial.available()) {
+      // Read and encode the data.
+      gpsData = gpsSerial.read();
+      if (gps.encode(gpsData)) {
+        // Once data is encoded, you can stop looping
+        Serial.println("GPS Data Received");
+        gpsListening = 0;
+        gps.f_get_position(latitude, longitude);
+        gps.get_datetime(date, time);
+        *latitude = float(round((*latitude) * 100.0)) / 100.0;
+        *longitude = float(round((*longitude) * 100.0)) / 100.0;
+      }
+    }
+  }
+}
+
+void changeLEDColor(int isSafe) {
+  if (isSafe == 1) {
+    Serial.println("Safe");
+    setRgbLedColor(0, 1, 0);
+  } else {
+    Serial.println("Unsafe");
+    setRgbLedColor(1, 0, 0);
+  }
+}
+
+void setRgbLedColor(int r, int g, int b) {
+  analogWrite(redLEDPin, r);
+  analogWrite(greenLEDPin, g);
+  analogWrite(blueLEDPin, b);
+}
+
+//##################################################################
+/////////////////////////// MAIN ///////////////////////////////////
+//##################################################################
+
 String takeReading() {
-  int numOfReadings = 10;
+  int numOfReadings = 5;
   float *chl = (float*)calloc(numOfReadings, sizeof(float));
   float *cond = (float*)calloc(numOfReadings, sizeof(float));
   float *flu = (float*)calloc(numOfReadings, sizeof(float));
@@ -164,50 +225,15 @@ String takeReading() {
   int stableIndex = 0; // findCommonStableIndex(numOfReadings, chl, cond, flu, nit, pH, turb);
   int safe = 0; // isSafe(stableIndex, numOfReadings, chl, cond, flu, nit, pH, turb);
   String message = createMessage(stableIndex, numOfReadings, safe, latitude, longitude, date, time, chl, cond, flu, nit, pH, turb, t);
-  Serial.println(message);
+  free(chl);
+  free(cond);
+  free(flu);
+  free(nit);
+  free(pH);
+  free(turb);
+  free(t);
   changeLEDColor(safe);
   return message;
-}
-
-
-void gpsInfo(TinyGPS &gps, float *latitude, float *longitude, unsigned long *date, unsigned long *time) {
-  // Make arduino listen to GPS
-  gpsSerial.listen();
-  Serial.println("Listening to GPS");
-  // Check if Arduino is listening to GPS
-  int gpsListening = gpsSerial.isListening();
-  while(gpsListening) {
-    // Loop until there is data in the serial buffer
-    if (gpsSerial.available()) {
-      // Read and encode the data.
-      gpsData = gpsSerial.read();
-      if (gps.encode(gpsData)) {
-        // Once data is encoded, you can stop looping
-        Serial.println("GPS Data Received");
-        gpsListening = 0;
-        gps.f_get_position(latitude, longitude);
-        gps.get_datetime(date, time);
-        *latitude = float(round((*latitude) * 100.0)) / 100.0;
-        *longitude = float(round((*longitude) * 100.0)) / 100.0;
-      }
-    }
-  }
-}
-
-float readChl() {
-  int chlValue = analogRead(chlPin);
-  float chl = float(chlValue);
-  Serial.print("Chl - ");
-  Serial.println(chl);
-  return chl;
-}
-
-float readFlu() {
-  int fluValue = analogRead(fluPin);
-  float flu = float(fluValue);
-  Serial.print("Flu - ");
-  Serial.println(flu);
-  return flu;
 }
 
 int findCommonStableIndex(int numOfReadings, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb) {
@@ -288,29 +314,38 @@ float getMean(float *resultsArray, int startIndex, int numOfReadings) {
   return mean;
 }
 
-String createMessage(int start_idx, int numOfReadings, int result, float latitude, float longitude, unsigned long date, unsigned long time, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb, unsigned long *t) {
-  String message = "";
-  for(int i = start_idx; i < numOfReadings; i++) {
-    message.concat(String(t[i])+ "," + String(chl[i]) + "," + String(cond[i]) + "," + String(flu[i]) + "," + String(nit[i]) + "," + String(pH[i]) + "," + String(turb[i]) + "?");
-  }
-  message.concat(String(latitude) + "," + String(longitude) + "," + String(date) + "," + String(time) + "," + String(result) + "!");
-  return message;
+
+
+//##################################################################
+/////////////////////////// SENSORS ////////////////////////////////
+//##################################################################
+
+float readChl() {
+  int chlValue = analogRead(chlPin);
+  float chl = float(chlValue);
+  Serial.print("Chl - ");
+  Serial.println(chl);
+  return chl;
 }
 
-void changeLEDColor(int isSafe) {
-  if (isSafe == 1) {
-    Serial.println("Safe");
-    setRgbLedColor(0, 1, 0);
+float readFlu() {
+  int fluValue = analogRead(fluPin);
+  float flu = float(fluValue);
+  Serial.print("Flu - ");
+  Serial.println(flu);
+  return flu;
+}
+
+int inWater() {
+  int value = digitalRead(WATER_SENSOR);
+  if (value == 1) {
+    Serial.print("Not in water - ");
+    Serial.println(value);
   } else {
-    Serial.println("Unsafe");
-    setRgbLedColor(1, 0, 0);
+    Serial.print("In water - ");
+    Serial.println(value);
   }
-}
-
-void setRgbLedColor(int r, int g, int b) {
-  analogWrite(redLEDPin, r);
-  analogWrite(greenLEDPin, g);
-  analogWrite(blueLEDPin, b);
+  return 1;
 }
 
 float readConductivity() {
