@@ -1,32 +1,25 @@
-
-#include <SoftwareSerial.h>
-
-const int txPin = 2;
-const int rxPin = 3;
-
-SoftwareSerial bleSerial(txPin, rxPin);
-
-int counter = -1;
+#define WATER_SENSOR 2
 
 void setup() {
-  Serial.begin(9600);
-  bleSerial.begin(9600);
+  // put your setup code here, to run once:
+  Serial.begin (9600);
+  pinMode(WATER_SENSOR, INPUT);
 }
 
 void loop() {
-  String bleData = "_";
+  // put your main code here, to run repeatedly:
+  inWater();
+  delay(500);
+}
 
-  if (bleSerial.available()) {
-    bleData = bleSerial.readString();
-    Serial.write("RECEIVED:");
-    Serial.println(bleData);
+int inWater() {
+  int value = digitalRead(WATER_SENSOR);
+  if (value == 1) {
+    Serial.print("Not in water - ");
+    Serial.println(value);
+  } else {
+    Serial.print("In water - ");
+    Serial.println(value);
   }
-
-  if (bleData == "takeReading") {
-    delay(5000);
-    Serial.write("TRANSMITTED");
-    bleSerial.println("5,4,dateTime,3,37.78825,-122.4324,2,1,1,2,3");
-    bleSerial.println("$");
-    bleData = '_';
-  }
+  return value;
 }
