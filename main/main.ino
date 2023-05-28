@@ -22,16 +22,8 @@ float readConductivity() {
   // Set all variables to zero.
   float Cond_Voltage1 = 0; // A1 - Output voltage 1.
   float Cond_Voltage2 = 0; // A4 - Output voltage 2.
-  float Cond_Current1 = 0; // A1 - Output current 1.
-  float Cond_Current2 = 0; // A4 - Output current 2.
   float Cond_Temp1 = 0;    // A2 - Temperature 1.
   float Cond_Temp2 = 0;    // A3 - Temperature 2.
-
-  float Avg_Temp;          // Average Temperature of the solution.
-  float Avg_Voltage;       // Average Voltage.
-  float Avg_Current;       // Average Current.
-  float Conductance;       // Conductance of the solution.
-  float Conductivity;      // Electrical Conductivity of the solution.
 
   float resistance = 1000; // Resistance (Ohms).
   float length = 1;        // Length of the solution (m).
@@ -43,15 +35,15 @@ float readConductivity() {
   Cond_Voltage2 += ((float)analogRead(condPin1)/1023)*5;
 
   // Calculate current and average variables.
-  Cond_Current1 = (float)(Cond_Voltage1/resistance);
-  Cond_Current2 = (float)(Cond_Voltage2/resistance);
-  Avg_Temp = (float)(Cond_Temp1 + Cond_Temp2)/2;
-  Avg_Voltage = (float)(Cond_Voltage1 + Cond_Voltage2)/2;
-  Avg_Current = (float)((Cond_Current1 + Cond_Current2)/2);
+  float Cond_Current1 = (float)(Cond_Voltage1/resistance);
+  float Cond_Current2 = (float)(Cond_Voltage2/resistance);
+  float Avg_Temp = (float)(Cond_Temp1 + Cond_Temp2)/2;
+  float Avg_Voltage = (float)(Cond_Voltage1 + Cond_Voltage2)/2;
+  float Avg_Current = (float)((Cond_Current1 + Cond_Current2)/2);
 
   // Calculate conductance and conductivity.
-  Conductance = Avg_Current/Avg_Voltage;
-  Conductivity = (Conductance * length) / (length + (Conductance * 0.4) + (Avg_Temp - 25));    // Define length.
+  float Conductance = Avg_Current/Avg_Voltage;
+  float Conductivity = (Conductance * length) / (length + (Conductance * 0.4) + (Avg_Temp - 25));    // Define length.
 
   Serial.println("Conductivity");
   Serial.println(Conductivity);
