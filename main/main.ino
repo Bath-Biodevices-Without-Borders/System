@@ -1,6 +1,8 @@
 #include <SoftwareSerial.h>
 #include <math.h>
 #include "TinyGPS.h"
+#include <OneWire.h>
+#include <DallasTemperature.h>
 TinyGPS gps;
 
 //##################################################################
@@ -20,7 +22,8 @@ TinyGPS gps;
 
 #define startBtnPin 10
 
-#define WATER_SENSOR 11
+#define ONE_WIRE_BUS 11
+#define WATER_SENSOR 12
 
 #define condPin1 A0
 #define condTempPin1 A1
@@ -41,6 +44,9 @@ SoftwareSerial gpsSerial(gpsTxPin, gpsRxPin);
 
 void gpsInfo(TinyGPS &gps);
 byte gpsData;
+
+OneWire oneWire(ONE_WIRE_BUS); 
+DallasTemperature tempSensor(&oneWire);
 
 //##################################################################
 /////////////////////////// SETUP //////////////////////////////////
@@ -70,6 +76,7 @@ void setup() {
   pinMode(WATER_SENSOR, INPUT);
   // put your setup code here, to run once:
   Serial.begin (9600);
+  tempSensor.begin();
   gpsSerial.begin(9600);
   bleSerial.begin(9600);
 };
@@ -385,7 +392,7 @@ float readNit() {
   // int nitValue = analogRead(nitPin);
   // float nit = float(nitValue);
   // return nit;
-  return 0;
+  return readTemp();
 }
 
 float readpH() {
@@ -436,5 +443,8 @@ int inWater() {
   return 1;
 }
 
-float readConductivity() {
+float readTemp() {
+  tempSensor.requestTemperatures();
+  float temperature = tempSensor.getTempCByIndex(0);
+  return temperature;
 }
