@@ -88,6 +88,7 @@ void loop() {
     if (inWater()) {
       Serial.println("takeReading");
       takeReading();
+      bluetoothEnabled = 0;
       startBtnState = 0;
       ledStartTime = millis();
     } else {
@@ -133,9 +134,7 @@ void transmitBluetoothMessage(int start_idx, int numOfReadings, int result, floa
       bleSerial.println(subMessage);
       int transmitted = 0;
       while (!transmitted) {
-        if (!bleSerial.available()) {
-          delay(10);
-        } else {
+        if (bleSerial.available()) {
           String receivedMessage = bleSerial.readString();
           if (receivedMessage == "next") {
             transmitted = 1;
@@ -188,9 +187,9 @@ void changeLEDColor(int isSafe) {
 }
 
 void setRgbLedColor(int r, int g, int b) {
-  analogWrite(redLEDPin, r);
-  analogWrite(greenLEDPin, g);
-  analogWrite(blueLEDPin, b);
+  digitalWrite(redLEDPin, r);
+  digitalWrite(greenLEDPin, g);
+  digitalWrite(blueLEDPin, b);
 }
 
 //##################################################################
@@ -226,11 +225,11 @@ void takeReading() {
     if (currentTime > (prevTime + timeInterval)) {
       prevTime += timeInterval;
       chl[index] = readChl();
-      cond[index] = 0;
+      cond[index] = readCond();
       flu[index] = readFlu();
-      nit[index] = 0;
-      pH[index] = 0;
-      turb[index] = 0;
+      nit[index] = readNit();
+      pH[index] = readpH();
+      turb[index] = readTurb(numOfReadings);
       t[index] = timeInterval * index;
       index++;
     }
@@ -238,7 +237,8 @@ void takeReading() {
   Serial.println("Done Reading Sensors");
 
   int stableIndex = 0; // findCommonStableIndex(numOfReadings, chl, cond, flu, nit, pH, turb);
-  int safe = 0; // isSafe(stableIndex, numOfReadings, chl, cond, flu, nit, pH, turb);
+  int safe = 1; // isSafe(stableIndex, numOfReadings, chl, cond, flu, nit, pH, turb);
+  changeLEDColor(safe);
   transmitBluetoothMessage(stableIndex, numOfReadings, safe, latitude, longitude, date, time, chl, cond, flu, nit, pH, turb, t);
   free(chl);
   free(cond);
@@ -247,7 +247,6 @@ void takeReading() {
   free(pH);
   free(turb);
   free(t);
-  changeLEDColor(safe);
 }
 
 int findCommonStableIndex(int numOfReadings, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb) {
@@ -338,66 +337,67 @@ float readChl() {
   // int chlValue = analogRead(chlPin);
   // float chl = float(chlValue);
   // return chl;
-  return -1;
+  return 0;
 }
 
 float readCond() {
-  // put your main code here, to run repeatedly:
-  // Set all variables to zero.
-  float Cond_Voltage1 = 0; // A1 - Output voltage 1.
-  float Cond_Voltage2 = 0; // A4 - Output voltage 2.
-  float Cond_Temp1 = 0;    // A2 - Temperature 1.
-  float Cond_Temp2 = 0;    // A3 - Temperature 2.
+  return 0;
+  // // put your main code here, to run repeatedly:
+  // // Set all variables to zero.
+  // float Cond_Voltage1 = 0; // A1 - Output voltage 1.
+  // float Cond_Voltage2 = 0; // A4 - Output voltage 2.
+  // float Cond_Temp1 = 0;    // A2 - Temperature 1.
+  // float Cond_Temp2 = 0;    // A3 - Temperature 2.
 
-  float resistance = 1000; // Resistance (Ohms).
-  float length = 1;        // Length of the solution (m).
+  // float resistance = 1000; // Resistance (Ohms).
+  // float length = 1;        // Length of the solution (m).
 
-  // Read values on input pins.
-  Cond_Voltage1 += ((float)analogRead(condPin1)/1023)*5;
-  Cond_Temp1 += ((float)analogRead(condTempPin1)/1023)*5;
-  Cond_Temp2 += ((float)analogRead(condTempPin2)/1023)*5;
-  Cond_Voltage2 += ((float)analogRead(condPin1)/1023)*5;
+  // // Read values on input pins.
+  // Cond_Voltage1 += ((float)analogRead(condPin1)/1023)*5;
+  // Cond_Temp1 += ((float)analogRead(condTempPin1)/1023)*5;
+  // Cond_Temp2 += ((float)analogRead(condTempPin2)/1023)*5;
+  // Cond_Voltage2 += ((float)analogRead(condPin1)/1023)*5;
 
-  // Calculate current and average variables.
-  float Cond_Current1 = (float)(Cond_Voltage1/resistance);
-  float Cond_Current2 = (float)(Cond_Voltage2/resistance);
-  float Avg_Temp = (float)(Cond_Temp1 + Cond_Temp2)/2;
-  float Avg_Voltage = (float)(Cond_Voltage1 + Cond_Voltage2)/2;
-  float Avg_Current = (float)((Cond_Current1 + Cond_Current2)/2);
+  // // Calculate current and average variables.
+  // float Cond_Current1 = (float)(Cond_Voltage1/resistance);
+  // float Cond_Current2 = (float)(Cond_Voltage2/resistance);
+  // float Avg_Temp = (float)(Cond_Temp1 + Cond_Temp2)/2;
+  // float Avg_Voltage = (float)(Cond_Voltage1 + Cond_Voltage2)/2;
+  // float Avg_Current = (float)((Cond_Current1 + Cond_Current2)/2);
 
-  // Calculate conductance and conductivity.
-  float Conductance = Avg_Current/Avg_Voltage;
-  float Conductivity = (Conductance * length) / (length + (Conductance * 0.4) + (Avg_Temp - 25));    // Define length.
+  // // Calculate conductance and conductivity.
+  // float Conductance = Avg_Current/Avg_Voltage;
+  // float Conductivity = (Conductance * length) / (length + (Conductance * 0.4) + (Avg_Temp - 25));    // Define length.
 
-  Serial.println("Conductivity");
-  Serial.println(Conductivity);
-  return Conductivity;
+  // Serial.println("Conductivity");
+  // Serial.println(Conductivity);
+  // return Conductivity;
 }
 
 float readFlu() {
   // int fluValue = analogRead(fluPin);
   // float flu = float(fluValue);
   // return flu;
-  return -1;
+  return 0;
 }
 
 float readNit() {
   // int nitValue = analogRead(nitPin);
   // float nit = float(nitValue);
   // return nit;
-  return -1;
+  return 0;
 }
 
 float readpH() {
   // int pHValue = analogRead(pHPin);
   // float pH = float(pHValue);
   // return pH;
-  return -1;
+  return 0;
 }
 
-float readTurb() {
+float readTurb(int numberOfReadings) {
   float TurbiditySensorVoltage = 0;
-  int samples = 10000;
+  int samples = (int)ceil(10000 / numberOfReadings);
   for (int i=0; i<samples; i++) {
     // Conversion of raw sensor reading to a voltage
     TurbiditySensorVoltage += ((float)analogRead(turbPin)/1023)*5;
