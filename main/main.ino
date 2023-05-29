@@ -436,11 +436,12 @@ int inWater() {
   if (value == 1) {
     Serial.print("Not in water - ");
     Serial.println(value);
+    return 0;
   } else {
     Serial.print("In water - ");
     Serial.println(value);
+    return 1;
   }
-  return 1;
 }
 
 float readTemp() {
