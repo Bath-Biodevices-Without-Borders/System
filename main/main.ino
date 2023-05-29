@@ -83,7 +83,7 @@ void loop() {
   if (bluetoothEnabled || startBtnState == HIGH) {
     if (inWater()) {
       Serial.println("takeReading");
-      String message = takeReading();
+      takeReading();
       startBtnState = 0;
       ledStartTime = millis();
     } else {
@@ -119,23 +119,34 @@ int receiveBluetoothMessage() {
   return enabled;
 }
 
-void transmitBluetoothMessage(String message) {
-  Serial.println("BLE Sent Message");
+void transmitBluetoothMessage(int start_idx, int numOfReadings, int result, float latitude, float longitude, unsigned long date, unsigned long time, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb, unsigned long *t) {
   bleSerial.listen();
-  bleSerial.print(message);
-}
-
-String createMessage(int start_idx, int numOfReadings, int result, float latitude, float longitude, unsigned long date, unsigned long time, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb, unsigned long *t) {
-  String message = "";
   for(int i = start_idx; i < numOfReadings; i++) {
     String subMessage = String(t[i])+ "," + String(chl[i]) + "," + String(cond[i]) + "," + String(flu[i]) + "," + String(nit[i]) + "," + String(pH[i]) + "," + String(turb[i]) + "?";
     Serial.println(subMessage);
-    message.concat(subMessage);
+
+    if (bluetoothEnabled) {
+      bleSerial.println(subMessage);
+      int transmitted = 0;
+      while (!transmitted) {
+        if (!bleSerial.available()) {
+          delay(10);
+        } else {
+          String receivedMessage = bleSerial.readString();
+          if (receivedMessage == "next") {
+            transmitted = 1;
+          }
+        }
+      }
+    }
+
   }
   String subMessage = String(latitude) + "," + String(longitude) + "," + String(date) + "," + String(time) + "," + String(result) + "!";
   Serial.println(subMessage);
-  message.concat(subMessage);
-  return message;
+
+  if (bluetoothEnabled) {
+    bleSerial.println(subMessage);
+  }
 }
 
 void gpsInfo(TinyGPS &gps, float *latitude, float *longitude, unsigned long *date, unsigned long *time) {
@@ -182,8 +193,8 @@ void setRgbLedColor(int r, int g, int b) {
 /////////////////////////// MAIN ///////////////////////////////////
 //##################################################################
 
-String takeReading() {
-  int numOfReadings = 5;
+void takeReading() {
+  int numOfReadings = 20;
   float *chl = (float*)calloc(numOfReadings, sizeof(float));
   float *cond = (float*)calloc(numOfReadings, sizeof(float));
   float *flu = (float*)calloc(numOfReadings, sizeof(float));
@@ -204,7 +215,7 @@ String takeReading() {
   gpsInfo(gps, &latitude, &longitude, &date, &time);
 
   int index = 0;
-  int timeInterval = 200;
+  int timeInterval = 100;
   unsigned long prevTime = millis();
   while(index < numOfReadings) {
     unsigned long currentTime = millis();
@@ -220,11 +231,11 @@ String takeReading() {
       index++;
     }
   }
-  Serial.println("Done taking readings");
+  Serial.println("Done Reading Sensors");
 
   int stableIndex = 0; // findCommonStableIndex(numOfReadings, chl, cond, flu, nit, pH, turb);
   int safe = 0; // isSafe(stableIndex, numOfReadings, chl, cond, flu, nit, pH, turb);
-  String message = createMessage(stableIndex, numOfReadings, safe, latitude, longitude, date, time, chl, cond, flu, nit, pH, turb, t);
+  transmitBluetoothMessage(stableIndex, numOfReadings, safe, latitude, longitude, date, time, chl, cond, flu, nit, pH, turb, t);
   free(chl);
   free(cond);
   free(flu);
@@ -233,7 +244,6 @@ String takeReading() {
   free(turb);
   free(t);
   changeLEDColor(safe);
-  return message;
 }
 
 int findCommonStableIndex(int numOfReadings, float *chl, float *cond, float *flu, float *nit, float *pH, float *turb) {
@@ -323,16 +333,12 @@ float getMean(float *resultsArray, int startIndex, int numOfReadings) {
 float readChl() {
   int chlValue = analogRead(chlPin);
   float chl = float(chlValue);
-  Serial.print("Chl - ");
-  Serial.println(chl);
   return chl;
 }
 
 float readFlu() {
   int fluValue = analogRead(fluPin);
   float flu = float(fluValue);
-  Serial.print("Flu - ");
-  Serial.println(flu);
   return flu;
 }
 
