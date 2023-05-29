@@ -27,8 +27,10 @@ TinyGPS gps;
 #define condTempPin2 A2
 #define condPin1 A3
 
-#define fluPin A4
-#define chlPin A5
+#define turbPin A4
+
+// #define fluPin A4
+// #define chlPin A5
 
 int ledStartTime = 0;
 
@@ -58,8 +60,10 @@ void setup() {
   pinMode(condTempPin2, INPUT);      // A3 - Temperature 2.
   pinMode(condPin1, INPUT);           // A4 - Output current 2.
 
-  pinMode(fluPin, INPUT);             // A5 - Fluorescence.
-  pinMode(chlPin, INPUT);             // A6 - Chlorophyll.
+  // pinMode(fluPin, INPUT);             // A5 - Fluorescence.
+  // pinMode(chlPin, INPUT);             // A6 - Chlorophyll.
+
+  pinMode(turbPin, INPUT);            // A7 - Turbidity.
 
   pinMode(startBtnPin, INPUT);
 
@@ -331,30 +335,13 @@ float getMean(float *resultsArray, int startIndex, int numOfReadings) {
 //##################################################################
 
 float readChl() {
-  int chlValue = analogRead(chlPin);
-  float chl = float(chlValue);
-  return chl;
+  // int chlValue = analogRead(chlPin);
+  // float chl = float(chlValue);
+  // return chl;
+  return -1;
 }
 
-float readFlu() {
-  int fluValue = analogRead(fluPin);
-  float flu = float(fluValue);
-  return flu;
-}
-
-int inWater() {
-  int value = digitalRead(WATER_SENSOR);
-  if (value == 1) {
-    Serial.print("Not in water - ");
-    Serial.println(value);
-  } else {
-    Serial.print("In water - ");
-    Serial.println(value);
-  }
-  return 1;
-}
-
-float readConductivity() {
+float readCond() {
   // put your main code here, to run repeatedly:
   // Set all variables to zero.
   float Cond_Voltage1 = 0; // A1 - Output voltage 1.
@@ -385,4 +372,69 @@ float readConductivity() {
   Serial.println("Conductivity");
   Serial.println(Conductivity);
   return Conductivity;
+}
+
+float readFlu() {
+  // int fluValue = analogRead(fluPin);
+  // float flu = float(fluValue);
+  // return flu;
+  return -1;
+}
+
+float readNit() {
+  // int nitValue = analogRead(nitPin);
+  // float nit = float(nitValue);
+  // return nit;
+  return -1;
+}
+
+float readpH() {
+  // int pHValue = analogRead(pHPin);
+  // float pH = float(pHValue);
+  // return pH;
+  return -1;
+}
+
+float readTurb() {
+  float TurbiditySensorVoltage = 0;
+  int samples = 10000;
+  for (int i=0; i<samples; i++) {
+    // Conversion of raw sensor reading to a voltage
+    TurbiditySensorVoltage += ((float)analogRead(turbPin)/1023)*5;
+  }
+  TurbiditySensorVoltage = TurbiditySensorVoltage/samples;
+  //Used to set the precision of the voltage measurement
+  float multiplier = powf(10.0f, 6);
+  TurbiditySensorVoltage = roundf(TurbiditySensorVoltage * multiplier) / multiplier;
+
+
+  // 2.5V is the lower bound of the voltage range
+  if (TurbiditySensorVoltage < 2.5) {
+    return 3000;
+  } else {
+    // Conversion from voltage to NTU
+    float ntu = -1120.4*square(TurbiditySensorVoltage)+ 6257.7*TurbiditySensorVoltage - 5732.9;
+    
+    // Calibration Equation Based from Turbidity Meter Correlation
+    return ((ntu - 1376)/13.822);
+    
+    // if (ActualNTU < 0) {
+    //   ActualNTU = 0;
+    // }
+  }
+}
+
+int inWater() {
+  int value = digitalRead(WATER_SENSOR);
+  if (value == 1) {
+    Serial.print("Not in water - ");
+    Serial.println(value);
+  } else {
+    Serial.print("In water - ");
+    Serial.println(value);
+  }
+  return 1;
+}
+
+float readConductivity() {
 }
