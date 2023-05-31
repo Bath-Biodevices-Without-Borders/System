@@ -22,8 +22,8 @@ TinyGPS gps;
 
 #define startBtnPin 10
 
-#define ONE_WIRE_BUS 11
-#define WATER_SENSOR 12
+#define WATER_SENSOR 11
+#define ONE_WIRE_BUS 12
 
 #define condPin1 A0
 #define condTempPin1 A1
@@ -165,6 +165,7 @@ void gpsInfo(TinyGPS &gps, float *latitude, float *longitude, unsigned long *dat
   Serial.println("Listening to GPS");
   // Check if Arduino is listening to GPS
   int gpsListening = gpsSerial.isListening();
+  int gpsStartTime = millis();
   while(gpsListening) {
     // Loop until there is data in the serial buffer
     if (gpsSerial.available()) {
@@ -179,6 +180,14 @@ void gpsInfo(TinyGPS &gps, float *latitude, float *longitude, unsigned long *dat
         *latitude = float(round((*latitude) * 100.0)) / 100.0;
         *longitude = float(round((*longitude) * 100.0)) / 100.0;
       }
+    }
+    if (millis() > (gpsStartTime + 10000)) {
+      Serial.println("GPS Timeout");
+      gpsListening = 0;
+      *latitude = 0.0f;
+      *longitude = 0.0f;
+      *date = 0.0f;
+      *time = 0.0f;
     }
   }
 }
