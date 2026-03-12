@@ -5,7 +5,7 @@
 
 // Create GPS abstraction class and UART interface
 static const uint32_t gpsBaud = 9600;
-SoftwareSerial gpsSerial(D1, D0);
+SoftwareSerial gpsSerial(43, 44);
 TinyGPSPlus gps;
 
 extern BLECharacteristic gpsLatChstic;

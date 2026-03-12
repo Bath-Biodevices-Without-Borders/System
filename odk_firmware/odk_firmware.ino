@@ -1,3 +1,8 @@
+//will not work with default plugins 
+//you must change: Tools, Pin numbering : "by GPIO number (legacy)""
+
+
+
 #undef pinMode
 #include <MCP23017.h>
 #include <Wire.h>
@@ -25,8 +30,8 @@ extern BLECharacteristic anlgCh1Chstic;
 #define OLED_CS    21
 #define OLED_RESET 17
 
-#define GPS_RX D1
-#define GPS_TX D0
+#define GPS_RX 43
+#define GPS_TX 44
 
 #define SR_DATA  7
 #define SR_LATCH 9
